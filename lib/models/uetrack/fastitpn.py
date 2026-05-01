@@ -324,6 +324,142 @@ class Attention(nn.Module):
 
         return x
 
+
+class Natter(nn.Module):
+    """Neighborhood Attention (Natter) - Local spatial attention mechanism"""
+    def __init__(self, dim, num_heads=8, attn_drop=0., proj_drop=0., kernel_size=7):
+        super().__init__()
+        self.num_heads = num_heads
+        self.kernel_size = kernel_size
+        self.dim = dim
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+        
+        self.qkv = nn.Linear(dim, dim * 3, bias=True)
+        self.attn_drop = nn.Dropout(attn_drop)
+        self.proj = nn.Linear(dim, dim)
+        self.proj_drop = nn.Dropout(proj_drop)
+    
+    def forward(self, x):
+        """
+        x: (B, N, C) sequence of tokens
+        """
+        B, N, C = x.shape
+        
+        # Generate QKV
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+        
+        # Local attention computation
+        attn = (q @ k.transpose(-2, -1)) * self.scale
+        attn = attn.softmax(dim=-1)
+        attn = self.attn_drop(attn)
+        
+        # Combine attention with values
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+        x = self.proj(x)
+        x = self.proj_drop(x)
+        
+        return x
+
+
+class S3D(nn.Module):
+    """Spatial-Channel Separated Attention - Separates spatial and channel dimensions"""
+    def __init__(self, dim, expansion_ratio=4):
+        super().__init__()
+        self.dim = dim
+        self.expansion_dim = int(dim * expansion_ratio)
+        
+        # Spatial attention branch
+        self.spatial_fc1 = nn.Linear(dim, self.expansion_dim)
+        self.spatial_fc2 = nn.Linear(self.expansion_dim, dim)
+        
+        # Channel attention branch
+        self.channel_fc1 = nn.Linear(dim, self.expansion_dim)
+        self.channel_fc2 = nn.Linear(self.expansion_dim, dim)
+        
+        self.act = nn.GELU()
+    
+    def forward(self, x):
+        """
+        x: (B, N, C) sequence of tokens
+        Apply spatial and channel attention separately
+        """
+        # Spatial attention
+        spatial = self.act(self.spatial_fc1(x))
+        spatial = self.spatial_fc2(spatial)
+        
+        # Channel attention
+        channel = self.act(self.channel_fc1(x))
+        channel = self.channel_fc2(channel)
+        
+        # Combine spatial and channel attention
+        return spatial * channel
+
+
+class LASS(nn.Module):
+    """LASS Block: Local Attention with Spatial-channel Separation
+    Combines Natter (neighborhood attention) with S3D (spatial-channel separation)
+    """
+    def __init__(
+            self, dim, num_heads=8, qkv_bias=False, attn_drop=0., proj_drop=0.,
+            kernel_size=7, expansion_ratio=4, mlp_ratio=4., norm_layer=nn.LayerNorm
+    ):
+        super().__init__()
+        self.norm1 = norm_layer(dim)
+        
+        # Neighborhood attention layer (Natter)
+        self.natter = Natter(
+            dim=dim,
+            num_heads=num_heads,
+            attn_drop=attn_drop,
+            proj_drop=proj_drop,
+            kernel_size=kernel_size
+        )
+        
+        # Spatial-channel separation layer (S3D)
+        self.s3d = S3D(dim=dim, expansion_ratio=expansion_ratio)
+        
+        # Linear projection (Lx1Conv equivalent)
+        self.lx1conv = nn.Linear(dim, dim)
+        
+        self.norm2 = norm_layer(dim)
+        
+        # Feed forward network
+        mlp_hidden_dim = int(dim * mlp_ratio)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, mlp_hidden_dim),
+            nn.GELU(),
+            nn.Linear(mlp_hidden_dim, dim),
+        )
+    
+    def forward(self, x, rel_pos_bias=None, attn_mask=None):
+        """
+        x: (B, N, C) or flattened sequence
+        """
+        # Normalize input
+        x_norm = self.norm1(x)
+        
+        # Apply Natter (neighborhood attention)
+        natter_out = self.natter(x_norm)
+        
+        # Apply S3D (spatial-channel separation)
+        s3d_out = self.s3d(x_norm)
+        
+        # Apply Lx1Conv (linear projection)
+        attention = natter_out * s3d_out
+        attention = self.lx1conv(attention)
+        
+        # Residual connection
+        x = x + attention
+        
+        # FFN block
+        x_norm = self.norm2(x)
+        x = x + self.mlp(x_norm)
+        
+        return x
+
+
 class RMSNorm(nn.Module):
     def __init__(self, dim):
         super().__init__()
@@ -351,6 +487,7 @@ class Block(nn.Module):
                  layer_index=0,
                  moe_layer=[1],
                  num_experts=1,
+                 use_lass=False,
                  ):
         super().__init__()
 
@@ -358,15 +495,31 @@ class Block(nn.Module):
         self.layer_index = layer_index
         self.moe_layer  = moe_layer
         self.num_experts = num_experts
+        self.use_lass = use_lass
 
         self.norm1 = norm_layer(dim) if with_attn else None
-        self.attn = Attention(
-            dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
-            attn_drop=attn_drop, proj_drop=drop, window_size=window_size,
-            use_decoupled_rel_pos_bias=use_decoupled_rel_pos_bias, attn_head_dim=attn_head_dim,
-            deepnorm=deepnorm,
-            subln=subln
-        ) if with_attn else None
+        
+        # Use LASS instead of MHA if use_lass is True
+        if use_lass and with_attn:
+            self.attn = LASS(
+                dim=dim,
+                num_heads=num_heads,
+                qkv_bias=qkv_bias,
+                attn_drop=attn_drop,
+                proj_drop=drop,
+                kernel_size=7,
+                expansion_ratio=4.,
+                mlp_ratio=1.,
+                norm_layer=norm_layer
+            )
+        else:
+            self.attn = Attention(
+                dim, num_heads=num_heads, qkv_bias=qkv_bias, qk_scale=qk_scale,
+                attn_drop=attn_drop, proj_drop=drop, window_size=window_size,
+                use_decoupled_rel_pos_bias=use_decoupled_rel_pos_bias, attn_head_dim=attn_head_dim,
+                deepnorm=deepnorm,
+                subln=subln
+            ) if with_attn else None
 
         self.drop_path = DropPath(drop_path) if drop_path > 0. else nn.Identity()
         self.norm2 = norm_layer(dim)
@@ -441,6 +594,13 @@ class Block(nn.Module):
         return True, F.pad(x, (*pad_offset, 0, remainder), value=value)
 
     def forward(self, x, task_index, rel_pos_bias=None, attn_mask=None):
+        # LASS block already includes normalization and FFN, so we handle it separately
+        if self.use_lass and self.attn is not None:
+            # LASS handles its own normalization and FFN
+            x = x + self.drop_path(self.attn(x, rel_pos_bias=rel_pos_bias, attn_mask=attn_mask))
+            return x
+        
+        # Original MHA-based block code below
         if self.gamma_2 is None:
             if self.postnorm:
                 if self.attn is not None:
@@ -834,6 +994,7 @@ class Fast_iTPN(nn.Module):
                  num_experts=1,
                  moe_layer=[3],
                  distill_layer=[],
+                 use_lass=False,
                  **kwargs):
         super().__init__()
         self.search_size = search_size
@@ -854,6 +1015,7 @@ class Fast_iTPN(nn.Module):
         self.use_shared_decoupled_rel_pos_bias = use_shared_decoupled_rel_pos_bias
         self.use_decoupled_rel_pos_bias = False
         self.distill_layer = distill_layer
+        self.use_lass = use_lass
 
         mlvl_dims = {'4': embed_dim // 4, '8': embed_dim // 2, '16': embed_dim}
         # split image into non-overlapping patches
@@ -922,6 +1084,7 @@ class Fast_iTPN(nn.Module):
             convmlp=convmlp,
             moe_layer=moe_layer,
             num_experts=num_experts,
+            use_lass=use_lass,
         )
 
         self.norm = nn.Identity() if use_mean_pooling else norm_layer(embed_dim)
@@ -965,6 +1128,7 @@ class Fast_iTPN(nn.Module):
                      convmlp=False,
                      num_experts=1,
                      moe_layer=[3],
+                     use_lass=False,
                      ):
         dpr = iter(x.item() for x in torch.linspace(0, drop_path_rate, depths[0] + depths[1] + depths[2]))
 
@@ -1073,6 +1237,7 @@ class Fast_iTPN(nn.Module):
                 layer_index=i,
                 moe_layer=moe_layer,
                 num_experts=num_experts,
+                use_lass=use_lass,
             ) for i in range(depths[2])
         ])
 

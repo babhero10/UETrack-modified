@@ -6,7 +6,7 @@ import torch.nn as nn
 from lib.train.dataset import Lasot, Got10k, MSCOCOSeq, ImagenetVID, TrackingNet, Imagenet1k, VastTrack
 from lib.train.dataset import Lasot_lmdb, Got10k_lmdb, MSCOCOSeq_lmdb, ImagenetVID_lmdb, TrackingNet_lmdb
 from lib.train.dataset import VisEvent, LasHeR, DepthTrack
-from lib.train.dataset import Otb99_lang, Tnl2k, RefCOCOSeq
+from lib.train.dataset import Otb99_lang, Tnl2k, RefCOCOSeq, CustomManifest
 from lib.train.data import sampler, opencv_loader, processing, LTRLoader
 import lib.train.data.transforms as tfm
 from lib.utils.misc import is_main_process
@@ -42,7 +42,7 @@ def names2datasets(name_list: list, settings, image_loader):
         assert name in ["LASOT", "GOT10K_vottrain", "GOT10K_votval", "GOT10K_train_full",
                         "COCO17", "VID", "TRACKINGNET", "IMAGENET1K",
                         "DepthTrack_train", "DepthTrack_val", "LasHeR_all", "LasHeR_train","LasHeR_val", "VisEvent",
-                        "REFCOCOG", "TNL2K_train", "OTB99_train","VASTTRACK"]
+                        "REFCOCOG", "TNL2K_train", "OTB99_train","VASTTRACK", "CUSTOM_MANIFEST"]
         if name == "LASOT":
             if settings.use_lmdb:
                 print("Building lasot dataset from lmdb")
@@ -206,6 +206,8 @@ def names2datasets(name_list: list, settings, image_loader):
                                        multi_modal_language=settings.multi_modal_language,
                                        use_nlp=settings.use_nlp['OTB99_LANG']
                                        ))
+        elif name == "CUSTOM_MANIFEST":
+            datasets.append(CustomManifest(settings.env.custom_manifest_dir, split='train', image_loader=image_loader))
 
     return datasets
 

@@ -77,6 +77,7 @@ def create_default_local_file_ITP_train(workspace_dir, data_dir):
         'refcoco_dir': os.path.join(data_dir, 'refcoco'),
         'tnl2k_dir': os.path.join(data_dir, 'tnl2k/train'),
         'otb99_dir': os.path.join(data_dir, 'otb_lang'),
+        'custom_manifest_dir': os.path.join(data_dir, 'custom_manifest'),
     })
 
     comment = {'workspace_dir': 'Base directory for saving network checkpoints.',

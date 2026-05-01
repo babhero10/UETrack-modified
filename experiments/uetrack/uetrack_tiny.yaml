@@ -1,7 +1,7 @@
 DATA:
   MAX_SAMPLE_INTERVAL: 400
-  MULTI_MODAL_LANGUAGE: True
-  MULTI_MODAL_VISION: True
+  MULTI_MODAL_LANGUAGE: False
+  MULTI_MODAL_VISION: False
   MEAN:
   - 0.485
   - 0.456
@@ -23,32 +23,21 @@ DATA:
     SIZE: 112
     NUMBER: 1
   TRAIN:
+    # RGB-only datasets
     DATASETS_NAME:
     - LASOT
     - GOT10K_vottrain
     - COCO17
     - TRACKINGNET
-    - VASTTRACK
-    - TNL2K_train
-    - OTB99_train
-    - DepthTrack_train
-    - VisEvent
-    - LasHeR_train
     DATASETS_RATIO:
     - 4
     - 4
     - 4
     - 4
-    - 4
-    - 3
-    - 1
-    - 2
-    - 2
-    - 2
     SAMPLE_PER_EPOCH: 100000
   USE_NLP:
-    TNL2K: True
-    OTB99_LANG: True
+    TNL2K: False
+    OTB99_LANG: False
 MODEL:
   ENCODER:
     TYPE: fastitpnt_layer2
@@ -59,6 +48,7 @@ MODEL:
     TOKEN_TYPE_INDICATE: True
     NUM_EXPERT: 2
     MOE_LAYER: [1]
+    USE_LASS: true  # Set to true for efficient attention (LASS)
   TEXT_ENCODER:
     TYPE: ViT-L/14
   DECODER:
@@ -113,10 +103,9 @@ TEST:
   TEMPLATE_SIZE: 112
   WINDOW: True
   MULTI_MODAL_VISION:
-    DEFAULT: True
+    DEFAULT: False  # RGB-only
   MULTI_MODAL_LANGUAGE:
-    DEFAULT: True
+    DEFAULT: False  # RGB-only
   USE_NLP:
     DEFAULT: False
-    TNL2K: True
 

@@ -20,6 +20,7 @@ class EnvSettings:
         self.trackingnet_path = ''
         self.davis_dir = ''
         self.youtubevos_dir = ''
+        self.custom_manifest_path = ''
 
         self.got_packed_results_path = ''
         self.got_reports_path = ''
@@ -77,6 +78,7 @@ class EnvSettings_ITP:
         self.youtubevos_dir = ''
         self.otblang_path = os.path.join(data_dir, 'otb_lang')
         self.lasotlang_path = os.path.join(data_dir, 'lasot')
+        self.custom_manifest_path = os.path.join(data_dir, 'custom_manifest')
 
         self.got_packed_results_path = ''
         self.got_reports_path = ''

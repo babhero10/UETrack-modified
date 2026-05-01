@@ -63,6 +63,7 @@ class Encoder(EncoderBase):
                 num_experts=cfg.MODEL.ENCODER.NUM_EXPERT,
                 moe_layer=cfg.MODEL.ENCODER.MOE_LAYER,
                 distill_layer=cfg.TRAIN.DISTILL_LAYER_S,
+                use_lass=cfg.MODEL.ENCODER.USE_LASS,
             )
             num_channels = 384
         else:

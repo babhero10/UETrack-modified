@@ -23,6 +23,8 @@ dataset_dict = dict(
     otb99_lang=DatasetInfo(module=pt % "otb99lang", class_name="OTB99LangDataset", kwargs=dict()),
     tnl2k=DatasetInfo(module=pt % "tnl2k", class_name="TNL2kDataset", kwargs=dict()),
     lasot_lang=DatasetInfo(module=pt % "lasotlang", class_name="LaSOTLangDataset", kwargs=dict()),
+    custom_manifest=DatasetInfo(module="lib.test.evaluation.custom_manifest_dataset", class_name="CustomManifestDataset", 
+                               kwargs=dict(manifest_dir='')),
 )
 
 
@@ -33,8 +35,13 @@ def load_dataset(name: str):
     if dset_info is None:
         raise ValueError('Unknown dataset \'%s\'' % name)
 
+    kwargs = dict(dset_info.kwargs)
+    if name == 'custom_manifest':
+        from lib.test.evaluation.environment import env_settings
+        kwargs['manifest_dir'] = env_settings().custom_manifest_path
+
     m = importlib.import_module(dset_info.module)
-    dataset = getattr(m, dset_info.class_name)(**dset_info.kwargs)  # Call the constructor
+    dataset = getattr(m, dset_info.class_name)(**kwargs)
     return dataset.get_sequence_list()
 
 

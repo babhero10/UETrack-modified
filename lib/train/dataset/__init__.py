@@ -22,4 +22,6 @@ from .visevent import VisEvent
 from .otb99_lang import Otb99_lang
 from .tnl2k import Tnl2k
 from .refcoco_seq import RefCOCOSeq
+# Custom dataset loader
+from .custom_manifest import CustomManifest
 

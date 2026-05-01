@@ -40,6 +40,7 @@ cfg.MODEL.ENCODER.STRIDE = 14
 cfg.MODEL.ENCODER.POS_TYPE = 'index' # type of loading the positional encoding. "interpolate" or "index".
 cfg.MODEL.ENCODER.TOKEN_TYPE_INDICATE = True # add a token_type_embedding to indicate the search, template_foreground, template_background
 cfg.MODEL.ENCODER.CLASS_TOKEN = True # class token
+cfg.MODEL.ENCODER.USE_LASS = False # Use LASS instead of MHA (Multi-Head Attention)
 
 cfg.MODEL.ENCODER.MOE_LAYER = []
 cfg.MODEL.ENCODER.NUM_EXPERT = 1
