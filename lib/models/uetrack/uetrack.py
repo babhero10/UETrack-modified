@@ -53,7 +53,8 @@ class SUTRACK(nn.Module):
             raise ValueError
 
     def forward_textencoder(self, text_data):
-        # Forward the encoder
+        if self.text_encoder is None:
+            return None, None
         text_src_teacher, text_src = self.text_encoder(text_data)
         return text_src_teacher, text_src
 
