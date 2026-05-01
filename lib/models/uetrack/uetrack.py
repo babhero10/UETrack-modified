@@ -145,9 +145,12 @@ class UETrack(nn.Module):
         self.num_frames = num_frames
         self.num_template = num_template
 
-        self.interface_text_proj = nn.Linear(self.text_encoder.textencoder_dim, self.encoder.num_channels)
-        trunc_normal_(self.interface_text_proj.weight, std=.02)
-        nn.init.constant_(self.interface_text_proj.bias, 0)
+        if self.text_encoder is not None:
+            self.interface_text_proj = nn.Linear(self.text_encoder.textencoder_dim, self.encoder.num_channels)
+            trunc_normal_(self.interface_text_proj.weight, std=.02)
+            nn.init.constant_(self.interface_text_proj.bias, 0)
+        else:
+            self.interface_text_proj = None
         self.adjust_layers = adjust_layers
 
 
@@ -156,8 +159,9 @@ class UETrack(nn.Module):
                 text_src=None, task_index=None,
                 feature=None, student_feature=None,mode="encoder"):
         if mode == "text":
-            text_src = text_src.type(self.interface_text_proj.weight.dtype)
-            text_src = self.interface_text_proj(text_src).unsqueeze(1)
+            if self.interface_text_proj is not None:
+                text_src = text_src.type(self.interface_text_proj.weight.dtype)
+                text_src = self.interface_text_proj(text_src).unsqueeze(1)
             return text_src
         elif mode == "encoder":
             return self.forward_encoder(template_list, search_list, template_anno_list, text_src, task_index)
@@ -173,10 +177,12 @@ class UETrack(nn.Module):
             raise ValueError
 
     def forward_textencoder_inference(self, text_data):
-        # Forward the encoder
+        if self.text_encoder is None:
+            return None
         text_src_teacher, text_src = self.text_encoder(text_data)
-        text_src = text_src.type(self.interface_text_proj.weight.dtype)
-        text_src = self.interface_text_proj(text_src).unsqueeze(1)
+        if self.interface_text_proj is not None:
+            text_src = text_src.type(self.interface_text_proj.weight.dtype)
+            text_src = self.interface_text_proj(text_src).unsqueeze(1)
         return text_src
 
     def forward_encoder(self, template_list, search_list, template_anno_list, text_src, task_index):
