@@ -174,11 +174,13 @@ class CustomManifest(BaseVideoDataset):
         # Load annotations
         annotations = self._read_annotations(meta['annotation_path'])
         
+        import torch
+        n = len(annotations)
         return {
-            'bbox': annotations,  # (N, 4) in [x, y, w, h] format
-            'valid': np.ones(len(annotations), dtype=bool),
-            'visible': np.ones(len(annotations), dtype=bool),
-            'n_frames': len(annotations),
+            'bbox': torch.tensor(annotations, dtype=torch.float32),
+            'valid': torch.ones(n, dtype=torch.bool),
+            'visible': torch.ones(n, dtype=torch.bool),
+            'n_frames': n,
             'fps': meta['fps'],
             'seq_name': seq_name
         }
