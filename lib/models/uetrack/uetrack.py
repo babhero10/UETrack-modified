@@ -307,7 +307,7 @@ def build_uetrack(cfg):
         task_feature_type=cfg.MODEL.TASK_DECODER.FEATURE_TYPE
     )
     #load teacher model
-    teacher_checkpoints = torch.load(cfg.TRAIN.TEACHER_PATH,map_location="cpu")
+    teacher_checkpoints = torch.load(cfg.TRAIN.TEACHER_PATH, map_location="cpu", weights_only=False)
     state_dict = teacher_checkpoints['net']
     teacher_model.load_state_dict(state_dict,strict=True)
     for p in teacher_model.parameters():

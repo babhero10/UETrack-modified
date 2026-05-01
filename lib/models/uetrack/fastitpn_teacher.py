@@ -1126,7 +1126,7 @@ def fastitpnt(pretrained=False, pos_type="interpolate", pretrain_type="", patche
         **kwargs)
     model.default_cfg = _cfg()
     if pretrained:
-        checkpoint = torch.load(pretrain_type, map_location="cpu")
+        checkpoint = torch.load(pretrain_type, map_location="cpu", weights_only=False)
         load_pretrained(model,checkpoint,pos_type,patchembed_init)
     return model
 
@@ -1173,6 +1173,6 @@ def fastitpnl(pretrained=False, pos_type="interpolate", pretrain_type="", patche
         **kwargs)
     model.default_cfg = _cfg()
     if pretrained:
-        checkpoint = torch.load(pretrain_type, map_location="cpu")
+        checkpoint = torch.load(pretrain_type, map_location="cpu", weights_only=False)
         load_pretrained(model,checkpoint,pos_type,patchembed_init)
     return model
